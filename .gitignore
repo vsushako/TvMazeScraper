@@ -1,0 +1,15 @@
+.vs/
+TvMazeScraper.IoC/bin/
+TvMazeScraper.IoC/obj/
+TvMazeScraper.Repository/bin/
+TvMazeScraper.Repository/obj/
+TvMazeScraper.Scheduler/bin/
+TvMazeScraper.Scheduler/obj/
+TvMazeScraper.Service/bin/
+TvMazeScraper.Service/obj/
+TvMazeScraper.ServiceTest/bin/
+TvMazeScraper.ServiceTest/obj/
+TvMazeScraper.Source/bin/
+TvMazeScraper.Source/obj/
+TvMazeScraper/bin/
+TvMazeScraper/obj/
