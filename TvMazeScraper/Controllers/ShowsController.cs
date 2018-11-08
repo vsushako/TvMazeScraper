@@ -1,8 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using TvMazeScraper.Service;
-using TvMazeScraper.Service.Model;
 
 namespace TvMazeScraper.Api.Controllers
 {
@@ -14,11 +13,18 @@ namespace TvMazeScraper.Api.Controllers
 
         public ShowsController(IShowsService showsService) => ShowsService = showsService;
         
-        // GET api/values
-        [HttpGet]
-        public async Task<IActionResult> Get()
+        [HttpGet()]
+        public async Task<IActionResult> Get([FromQuery(Name = "page")] int page)
         {
-            return Json(await ShowsService.Get());
+            if (page < 0) return new BadRequestObjectResult(new { Error = "Wrong page" });
+            try
+            {
+                return Json(await ShowsService.Get(page));
+            }
+            catch (Exception e)
+            {
+                return new BadRequestObjectResult(new { Error = e.Message });
+            }
         }
     }
 }

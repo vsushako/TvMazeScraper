@@ -1,9 +1,13 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using TvMazeScraper.Source.Model;
 using System.Configuration;
+using System.Net;
 using System.Runtime.Serialization;
+using System.Threading;
 
 namespace TvMazeScraper.Source
 {
@@ -11,37 +15,63 @@ namespace TvMazeScraper.Source
     {
         private IRequestSender RequestSender { get; }
 
-        public TvMazeScraperApi(IRequestSender requestSender)
+        private int _theLock = 0;
+
+        public TvMazeScraperApi(IRequestSender requestSender, string address)
         {
             RequestSender = requestSender;
+            RequestSender.Address = address;
         }
 
         public async Task<IEnumerable<CastModel>> GetCast(int showId)
         {
-            var resultStr = await RequestSender.Get($"/shows/{showId}/cast");
-            
-            return JsonConvert.DeserializeObject<IEnumerable<CastModel>>(resultStr);
+            return await GetResult<IEnumerable<CastModel>>($"/shows/{showId}/cast");
         }
 
         public async Task<ShowModel> GetShow(int id)
         {
-            var resultStr = await RequestSender.Get($"/shows/{id}");
-
-            return JsonConvert.DeserializeObject<ShowModel>(resultStr);
+            return await GetResult<ShowModel>($"/shows/{id}");
         }
 
         public async Task<IEnumerable<ShowModel>> GetShows(int page = 0)
         {
-            var resultStr = await RequestSender.Get($"/shows?page={page}");
-
-            return JsonConvert.DeserializeObject<IEnumerable<ShowModel>>(resultStr);
+            return await GetResult<IEnumerable<ShowModel>>($"/shows?page={page}");
         }
 
         public async Task<IDictionary<string, int>> GetUpdates()
         {
-            var resultStr = await RequestSender.Get("/updates/shows");
+            return await GetResult<IDictionary<string, int>>("/updates/shows");
+        }
 
-            return JsonConvert.DeserializeObject<IDictionary<string, int>>(resultStr);
+        private async Task<TResult> GetResult<TResult>(string address)
+        {
+            var resultStr = "";
+
+            try
+            {
+                // We come here only from scheduler, so no need lock enother threads
+                while (Interlocked.CompareExchange(ref _theLock, 0, 0) == 1)
+                {
+                    // wait if we have reached the timeout
+                    Thread.Sleep(5 * 1000);
+                }
+
+                resultStr = await RequestSender.Get(address);
+            }
+            catch (Exception e)
+            {
+                // If we reache timeout when wait
+                if (((e.InnerException as WebException)?.Response as HttpWebResponse)?.StatusCode !=
+                    HttpStatusCode.TooManyRequests) return default(TResult); 
+
+                Interlocked.Increment(ref _theLock);
+                Thread.Sleep(5 * 1000);
+                Interlocked.Decrement(ref _theLock);
+
+                return await GetResult<TResult>(address);
+            }
+
+            return JsonConvert.DeserializeObject<TResult>(resultStr);
         }
     }
 }

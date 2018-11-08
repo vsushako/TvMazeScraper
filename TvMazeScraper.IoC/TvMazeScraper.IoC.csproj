@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TvMazeScraper.Repository\TvMazeScraper.Repository.csproj" />
+    <ProjectReference Include="..\TvMazeScraper.Scheduler\TvMazeScraper.Scheduler.csproj" />
     <ProjectReference Include="..\TvMazeScraper.Service\TvMazeScraper.Service.csproj" />
   </ItemGroup>
 

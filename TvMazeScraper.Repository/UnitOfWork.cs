@@ -1,6 +1,4 @@
-﻿using System;
-using MongoDB.Driver;
-using TvMazeScraper.Repository.Model;
+﻿using MongoDB.Driver;
 using TvMazeScraper.Repository.Repository;
 
 namespace TvMazeScraper.Repository
@@ -12,8 +10,19 @@ namespace TvMazeScraper.Repository
         public IMongoDbContext MongoDbContext { get; set; }
 
         public IShowRepository Show { get; set; }
-        
-        public IClientSession Session => _session ?? (_session = MongoDbContext.TvMazeShows.Client.StartSession());
+
+        public IClientSession Session
+        {
+            get
+            {
+                if (_session != null) return _session;
+
+                _session = MongoDbContext.TvMazeShows.Client.StartSession();
+                _session.StartTransaction();
+
+                return _session;
+            }
+        }
 
         public void Dispose()
         {

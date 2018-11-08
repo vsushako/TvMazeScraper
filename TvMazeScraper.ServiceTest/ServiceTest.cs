@@ -54,9 +54,10 @@ namespace TvMazeScraper.ServiceTest
         {
             _tvMazeScraperApi = new Mock<ITvMazeScraperApi> { CallBase = false };
             _tvMazeScraperApi.Setup(t => t.GetUpdates()).ReturnsAsync(updated);
+            _tvMazeScraperApi.Setup(t => t.GetShow(It.IsAny<int>())).ReturnsAsync((int i) => showInViewModels?.FirstOrDefault(s => s.id == i));
             _tvMazeScraperApi.Setup(t => t.GetShows(It.IsAny<int>())).ReturnsAsync((int a) =>
             {
-                return a * 250 >= showInViewModels?.Max(s => s.id) ? showInViewModels : null;
+                return a * 250 <= showInViewModels?.Max(s => s.id) ? showInViewModels : null;
             });
             
             return _tvMazeScraperApi.Object;
@@ -165,7 +166,7 @@ namespace TvMazeScraper.ServiceTest
         [TestMethod]
         public async Task ServiceTest_CheckUpsertLastUpdatedExist_ExpectOk()
         {
-            var service = new ShowsService(SetupUpsertShowRepository(new [] { new Show { Updated = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() } }), SetupTvMazeServer(new Dictionary<string, int> { { "1", (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() } }));
+            var service = new ShowsService(SetupUpsertShowRepository(new [] { new Show { ExternalId = 1, Updated = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() } }), SetupTvMazeServer(new Dictionary<string, int> { { "1", (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() } }));
 
             await service.Sync();
 
@@ -236,7 +237,7 @@ namespace TvMazeScraper.ServiceTest
                 name = "test",
                 updated = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds()
             };
-            var factory = SetupUpsertShowRepository(new[] {new Show {ExternalId = 1, Name = "OldName", Updated = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() } });
+            var factory = SetupUpsertShowRepository(new[] {new Show {ExternalId = 1, Name = "OldName", Updated = (int)DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds() } });
 
             _showRepository.Setup(s => s.Update(It.IsAny<IEnumerable<Show>>())).Callback<IEnumerable<Show>>(u =>
             {
@@ -273,10 +274,10 @@ namespace TvMazeScraper.ServiceTest
             };
 
             var factory = SetupUpsertShowRepository(
-                new[] { new Show { ExternalId = 1, Name = "OldName", Updated = (int)DateTimeOffset.Now.ToUnixTimeSeconds() },
-                        new Show { ExternalId = 2, Name = "OldName", Updated = (int)DateTimeOffset.Now.ToUnixTimeSeconds() },
-                        new Show { ExternalId = 3, Name = "OldName", Updated = (int)DateTimeOffset.Now.ToUnixTimeSeconds() },
-                        new Show { ExternalId = 4, Name = "OldName", Updated = (int)DateTimeOffset.Now.ToUnixTimeSeconds() } });
+                new[] { new Show { ExternalId = 1, Name = "OldName", Updated = (int)DateTimeOffset.Now.AddDays(-1).ToUnixTimeSeconds() },
+                        new Show { ExternalId = 2, Name = "OldName", Updated = (int)DateTimeOffset.Now.AddDays(-1).ToUnixTimeSeconds() },
+                        new Show { ExternalId = 3, Name = "OldName", Updated = (int)DateTimeOffset.Now.AddDays(-1).ToUnixTimeSeconds() },
+                        new Show { ExternalId = 4, Name = "OldName", Updated = (int)DateTimeOffset.Now.AddDays(-1).ToUnixTimeSeconds() } });
 
             _showRepository.Setup(s => s.Update(It.IsAny<IEnumerable<Show>>())).Callback<IEnumerable<Show>>(elements =>
             {
@@ -284,7 +285,7 @@ namespace TvMazeScraper.ServiceTest
                 foreach (var s in newShows)
                 {
                     Assert.AreEqual(s.name, elements.First(u => u.ExternalId == s.id).Name);
-                    Assert.AreEqual(new DateTime(s.updated), elements.First(u => u.ExternalId == s.id).Updated);
+                    Assert.AreEqual(s.updated, elements.First(u => u.ExternalId == s.id).Updated);
                 }
             }).Returns(Task.FromResult(true));
             var service = new ShowsService(factory, SetupTvMazeServer(newShowsUpdates, newShows));
@@ -313,7 +314,7 @@ namespace TvMazeScraper.ServiceTest
                 Assert.AreEqual(1, u.Count());
                 Assert.AreEqual(newShow.name, u.First().Name);
                 Assert.AreEqual(newShow.id, u.First().ExternalId);
-                Assert.AreEqual(new DateTime(newShow.updated), u.First().Updated);
+                Assert.AreEqual(newShow.updated, u.First().Updated);
             }).Returns(Task.FromResult(true));
 
             var service = new ShowsService(factory, SetupTvMazeServer(new Dictionary<string, int> { { "1", (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() } }, new[] { newShow }));
@@ -381,7 +382,7 @@ namespace TvMazeScraper.ServiceTest
                 Assert.AreEqual(1, u.Count());
                 Assert.AreEqual(newShow.name, u.First().Name);
                 Assert.AreEqual(newShow.id, u.First().ExternalId);
-                Assert.AreEqual(new DateTime(newShow.updated), u.First().Updated);
+                Assert.AreEqual(newShow.updated, u.First().Updated);
             }).Returns(Task.FromResult(true));
 
             _showRepository.Setup(s => s.Remove(It.IsAny<IEnumerable<Show>>())).Callback<IEnumerable<Show>>(u =>
@@ -429,7 +430,7 @@ namespace TvMazeScraper.ServiceTest
                 foreach (var s in newShows)
                 {
                     Assert.AreEqual(s.name, elements.First(u => u.ExternalId == s.id).Name);
-                    Assert.AreEqual(new DateTime(s.updated), elements.First(u => u.ExternalId == s.id).Updated);
+                    Assert.AreEqual(s.updated, elements.First(u => u.ExternalId == s.id).Updated);
                 }
             }).Returns(Task.FromResult(true));
             _showRepository.Setup(s => s.Remove(It.IsAny<IEnumerable<Show>>())).Callback<IEnumerable<Show>>(elements =>

@@ -11,10 +11,9 @@ namespace TvMazeScraper.Source
 
         public async Task<string> Get(string url)
         {
-            var webRequest = (HttpWebRequest)WebRequest.Create(Address);
+            var webRequest = (HttpWebRequest)WebRequest.Create(Address + url);
             webRequest.ContentType = "application/json";
-            webRequest.Method = "Get";
-
+           
             try
             {
                 // Get server responce

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using TvMazeScraper.Repository.Model;
 
@@ -29,12 +30,25 @@ namespace TvMazeScraper.Repository.Repository
                 .SingleAsync();
         }
 
+        public async Task<IEnumerable<Show>> Get(int from, int to)
+        {
+            return await MongoDbContext
+                .TvMazeShows
+                .GetCollection<Show>(nameof(Show))
+                .Find(_ => true)
+                .Skip(from)
+                .Limit(to - from)
+                .Project(s => new Show { ExternalId = s.ExternalId, Cast = s.Cast.OrderByDescending(c => c.Birthday), Name = s.Name, Updated = s.Updated, Id = s.Id })
+                .ToListAsync();
+        }
+
         public async Task<IEnumerable<Show>> GetAll()
         {
             return await MongoDbContext
                 .TvMazeShows
                 .GetCollection<Show>(nameof(Show))
                 .Find(_ => true)
+                .Project(s => new Show { ExternalId = s.ExternalId, Cast = s.Cast.OrderByDescending(c => c.Birthday), Name = s.Name, Updated = s.Updated, Id = s.Id })
                 .ToListAsync();
         }
 
@@ -43,7 +57,7 @@ namespace TvMazeScraper.Repository.Repository
             await MongoDbContext
                 .TvMazeShows
                 .GetCollection<Show>(nameof(Show))
-                .InsertManyAsync((IClientSessionHandle) UnitOfWork.Session, entities);
+                .InsertManyAsync((IClientSessionHandle)UnitOfWork.Session, entities);
         }
 
         public async Task Update(IEnumerable<Show> entities)
@@ -80,12 +94,13 @@ namespace TvMazeScraper.Repository.Repository
         public async Task<int?> GetLastId()
         {
             return (await MongoDbContext
-                .TvMazeShows
-                .GetCollection<Show>(nameof(Show))
-                .Find(_ => true)
-                .SortByDescending(d => d.ExternalId)
-                .SingleOrDefaultAsync())
-                ?.Updated;
+                    .TvMazeShows
+                    .GetCollection<Show>(nameof(Show))
+                    .Find(_ => true)
+                    .SortByDescending(d => d.ExternalId)
+                    .Limit(1)
+                    .SingleOrDefaultAsync())
+                ?.ExternalId;
         }
     }
 }

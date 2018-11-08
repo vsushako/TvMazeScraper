@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TvMazeScraper.IoC\TvMazeScraper.IoC.csproj" />
     <ProjectReference Include="..\TvMazeScraper.Service\TvMazeScraper.Service.csproj" />
   </ItemGroup>
 

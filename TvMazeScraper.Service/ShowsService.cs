@@ -29,6 +29,12 @@ namespace TvMazeScraper.Service
                 return (await unitOfWork.Show.GetAll()).Select(PareseShowOutViewModel);
         }
 
+        public async Task<IEnumerable<ShowOutViewModel>> Get(int page)
+        {
+            using (var unitOfWork = UnitOfWorkFactory.CreateNew())
+                return (await unitOfWork.Show.Get(page * 250, ++page * 250)).Select(PareseShowOutViewModel);
+        }
+
         private ShowOutViewModel PareseShowOutViewModel(Show show)
         {
             return new ShowOutViewModel
@@ -92,7 +98,9 @@ namespace TvMazeScraper.Service
 
                 // Get last id and get all new shows
                 var lastId = await unitOfWork.Show.GetLastId();
-                await unitOfWork.Show.Add(await GetShowsFromId(lastId.Value + 1));
+                var newShows = (await GetShowsFromId(lastId.Value + 1)).ToList();
+                if(newShows.Any())
+                    await unitOfWork.Show.Add(newShows);
 
                 unitOfWork.Commit();
             }
@@ -100,30 +108,50 @@ namespace TvMazeScraper.Service
 
         private async Task<IEnumerable<Show>> GetShowsFromId(int id)
         {
-            var externalShows = (await TvMazeScraperApi.GetShows((int) Math.Floor((double)id / 250)))?.ToList();
+            var page = (int)Math.Floor((double)id / 250);
+            var externalShows = (await TvMazeScraperApi.GetShows(page))?.ToList();
             if (externalShows == null || !externalShows.Any()) return Enumerable.Empty<Show>();
 
-            var shows = externalShows.Where(s => s.id >= id).Select(ParseShow);
-            id = externalShows.Max(s => s.id);
-
+            var shows = (await ParseShows(externalShows.Where(s => s.id >= id)))?.ToList();
             while (externalShows.Any())
             {
-                externalShows = (await TvMazeScraperApi.GetShows((int)Math.Floor((double)id / 250)))?.ToList();
-                if (externalShows == null || !externalShows.Any()) return Enumerable.Empty<Show>();
+                externalShows = (await TvMazeScraperApi.GetShows(++page))?.ToList();
+                if (externalShows == null || !externalShows.Any()) return shows;
 
-                shows = externalShows.Select(ParseShow);
+                shows?.AddRange(await ParseShows(externalShows));
             }
 
             return shows;
         }
 
-        private Show ParseShow(ShowModel show)
+        private async Task<IEnumerable<Show>> ParseShows(IEnumerable<ShowModel> shows)
         {
-            return new Show { ExternalId = show.id, Name = show.name, Updated = show.updated };
+            var result = new List<Show>();
+            foreach (var t in shows)
+            {
+                var cast = await TvMazeScraperApi.GetCast(t.id);
+                result.Add(new Show { ExternalId = t.id, Name = t.name, Updated = t.updated, Cast = ParseCast(cast) });
+            }
+            
+            return result;
+        }
+
+        private IEnumerable<Cast> ParseCast(IEnumerable<CastModel> cast)
+        {
+            var result = new List<Cast>();
+            foreach (var c in cast)
+            {
+                DateTime.TryParse(c.person.birthday, out var birthday);
+                result.Add(new Cast { Birthday = birthday, ExternalId = c.person.id, Name = c.person.name });
+            }
+
+            return result;
         }
 
         private void UpdateShow(Show oldShow, ShowModel newShow)
         {
+            if (newShow == null) return;
+
             oldShow.Name = newShow.name;
             oldShow.Updated = newShow.updated;
         }
