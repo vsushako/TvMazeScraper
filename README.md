@@ -10,18 +10,27 @@
 The REST API should provide a JSON response when a call to a HTTP endpoint is made 
 
 ## Components
-TvMazeScraper.Api - main api service 
+TvMazeScraper.Api - main api service
+
 TvMazeScraper.IoC - IOC container to encapsulate realization methods from api
+
 TvMazeScraper.Repository - repository pattern. To store data uses mongoDB
+
 TvMazeScraper.Scheduler - scheduler to scrape data from http://www.tvmaze.com/api
+
 TvMazeScraper.Service - main service what provides business logic
+
 TvMazeScraper.Source - service what call TvMaze Api and gets data from it
 
 ### In MongoDB must be enabled transactions
 
-Docker run example:
+## Docker run example:
+
 docker pull mongo
+
 docker run -p 27017:27017 --name tvmazeapi -d mongo --smallfiles --replSet 'rs1' --storageEngine wiredTiger --port 27017
+
 docker exec -i -t tvmazeapi mongo --port 27017 --eval "rs.initiate()"
 
-MongoDb backup stored in TvMazeShows.7z file
+
+### MongoDb backup stored in TvMazeShows.7z file
