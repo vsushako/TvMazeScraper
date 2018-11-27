@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="HttpRequestSender.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="Microsoft.IdentityModel.Protocols">
       <HintPath>..\..\..\..\..\..\Program Files\dotnet\sdk\NuGetFallbackFolder\microsoft.identitymodel.protocols\5.2.0\lib\netstandard1.4\Microsoft.IdentityModel.Protocols.dll</HintPath>
     </Reference>

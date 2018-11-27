@@ -16,19 +16,27 @@ namespace TvMazeScraper.IoC
         public static void RegisterServices(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddTransient<IShowsService, ShowsService>();
-            services.AddTransient<IRequestSender, HttpRequestSender>();
 
-            services.AddTransient<ITvMazeScraperApi>(provider => new TvMazeScraperApi(provider.GetService<IRequestSender>(), configuration["tvMaze:address"]));
-            
+            if (!int.TryParse(configuration["callManager:waitPeriod"], out var waitPeriod))
+                waitPeriod = 1000;
+
+            if (!int.TryParse(configuration["callManager:elementsCount"], out var elementsCount))
+                elementsCount = 20;
+
+            services.AddTransient<ICallManager>(provider => new CallManager(waitPeriod) { ElementsCount = elementsCount });
+            services.AddHttpClient<IRequestSender, TvMazeClient>(client =>
+                client.BaseAddress = new Uri(configuration["tvMaze:address"]));
+
+            services.AddTransient<ITvMazeScraperApi, TvMazeScraperApi>();
+
             services.AddTransient<IUnitOfWorkFactory, UnitOfWorkFactory<UnitOfWork>>();
             services.AddTransient<IShowRepository, ShowRepository>();
             services.AddTransient<IJobFactory, JobFactory>();
             services.AddTransient<IJob, Scheduler.TvMazeScraper>();
             services.AddTransient<IMongoDbContext>(provider => new MongoDbContext(configuration["database:connection"]));
-            var schedulerInterval = configuration["scheduler:interval"];
 
             // if interval not set get updates each hour
-            if (!int.TryParse(schedulerInterval, out var interval))
+            if (!int.TryParse(configuration["scheduler:interval"], out var interval))
                 interval = 60;
 
             services.AddTransient<IScraperScheduler>(provider => new ScraperScheduler(interval, provider.GetService<IJobFactory>()));

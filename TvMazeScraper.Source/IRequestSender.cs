@@ -8,11 +8,6 @@ namespace TvMazeScraper.Source
     public interface IRequestSender
     {
         /// <summary>
-        /// Server Address
-        /// </summary>
-        string Address { get; set; }
-        
-        /// <summary>
         /// Method gets data from source
         /// </summary>
         /// <param name="url">Url destination</param>

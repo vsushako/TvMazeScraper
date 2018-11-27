@@ -112,30 +112,31 @@ namespace TvMazeScraper.Service
             var externalShows = (await TvMazeScraperApi.GetShows(page))?.ToList();
             if (externalShows == null || !externalShows.Any()) return Enumerable.Empty<Show>();
 
-            var shows = (await ParseShows(externalShows.Where(s => s.id >= id)))?.ToList();
+            var shows = (ParseShows(externalShows.Where(s => s.id >= id)))?.ToList();
+
             while (externalShows.Any())
             {
                 externalShows = (await TvMazeScraperApi.GetShows(++page))?.ToList();
                 if (externalShows == null || !externalShows.Any()) return shows;
 
-                shows?.AddRange(await ParseShows(externalShows));
+                shows?.AddRange(ParseShows(externalShows));
             }
 
             return shows;
         }
 
-        private async Task<IEnumerable<Show>> ParseShows(IEnumerable<ShowModel> shows)
+        private IEnumerable<Show> ParseShows(IEnumerable<ShowModel> shows)
         {
             var result = new List<Show>();
-            foreach (var t in shows)
+            Parallel.ForEach(shows, async t =>
             {
                 var cast = await TvMazeScraperApi.GetCast(t.id);
-                result.Add(new Show { ExternalId = t.id, Name = t.name, Updated = t.updated, Cast = ParseCast(cast) });
-            }
+                result.Add(new Show {ExternalId = t.id, Name = t.name, Updated = t.updated, Cast = ParseCast(cast)});
+            });
             
             return result;
         }
-
+        
         private IEnumerable<Cast> ParseCast(IEnumerable<CastModel> cast)
         {
             var result = new List<Cast>();

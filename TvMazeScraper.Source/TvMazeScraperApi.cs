@@ -1,12 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using TvMazeScraper.Source.Model;
-using System.Configuration;
 using System.Net;
-using System.Runtime.Serialization;
 using System.Threading;
 
 namespace TvMazeScraper.Source
@@ -15,12 +14,12 @@ namespace TvMazeScraper.Source
     {
         private IRequestSender RequestSender { get; }
 
-        private int _theLock = 0;
+        private ICallManager CallManager { get; }
 
-        public TvMazeScraperApi(IRequestSender requestSender, string address)
+        public TvMazeScraperApi(IRequestSender requestSender, ICallManager callManager)
         {
             RequestSender = requestSender;
-            RequestSender.Address = address;
+            CallManager = callManager;
         }
 
         public async Task<IEnumerable<CastModel>> GetCast(int showId)
@@ -45,33 +44,99 @@ namespace TvMazeScraper.Source
 
         private async Task<TResult> GetResult<TResult>(string address)
         {
-            var resultStr = "";
-
             try
             {
-                // We come here only from scheduler, so no need lock enother threads
-                while (Interlocked.CompareExchange(ref _theLock, 0, 0) == 1)
+                return await CallManager.Call(async () =>
                 {
-                    // wait if we have reached the timeout
-                    Thread.Sleep(5 * 1000);
-                }
-
-                resultStr = await RequestSender.Get(address);
+                    var resultStr = await RequestSender.Get(address);
+                    return JsonConvert.DeserializeObject<TResult>(resultStr);
+                });
             }
             catch (Exception e)
             {
-                // If we reache timeout when wait
-                if (((e.InnerException as WebException)?.Response as HttpWebResponse)?.StatusCode !=
-                    HttpStatusCode.TooManyRequests) return default(TResult); 
-
-                Interlocked.Increment(ref _theLock);
-                Thread.Sleep(5 * 1000);
-                Interlocked.Decrement(ref _theLock);
-
-                return await GetResult<TResult>(address);
+                Console.WriteLine(e);
+                throw;
             }
+        }
+    }
 
-            return JsonConvert.DeserializeObject<TResult>(resultStr);
+    public interface ICallManager
+    {
+        int ElementsCount { get; set; }
+
+        Task<TResult> Call<TResult>(Func<Task<TResult>> action);
+    }
+
+    public class CallManager : ICallManager
+    {
+        public int ElementsCount { get; set; }
+
+        private static int _theLock;
+
+        private static System.Timers.Timer Timer { get; set; }
+
+        private static BackgroundWorker Worker { get; set; }
+
+        private static EventWaitHandle EventWaitHandleFlag { get; set; } = new AutoResetEvent(false);
+
+        private static readonly ConcurrentQueue<EventWaitHandle> Handles = new ConcurrentQueue<EventWaitHandle>();
+
+        public CallManager(int waitPeriod)
+        {
+            if (Interlocked.CompareExchange(ref _theLock, 1, 0) == 1) return;
+
+            Worker = new BackgroundWorker();
+            Timer = new System.Timers.Timer(waitPeriod);
+
+            Worker.DoWork += HandleCalls;
+            Worker.RunWorkerCompleted += (sender, args) =>
+            {
+                if (!Timer.Enabled && Handles.Count != 0)
+                    Timer.Start();
+            };
+            Timer.Elapsed += (sender, args) => {
+                lock (Worker)
+                {
+                    if (!Worker.IsBusy && Handles.Count != 0)
+                        Worker.RunWorkerAsync();
+                    else
+                        Timer.Stop();
+                }
+            };
+            Timer.Start();
+        }
+
+        private void HandleCalls(object sender, DoWorkEventArgs e)
+        {
+            for (var i = 0; i < ElementsCount - 1; i++)
+            {
+                // Gets next element and enqueue it
+                Handles.TryDequeue(out var ev);
+
+                if (ev != null)
+                    ev.Set();
+                else
+                {
+                    EventWaitHandleFlag.WaitOne();
+                }
+            }
+        }
+
+        public async Task<TResult> Call<TResult>(Func<Task<TResult>> action)
+        {
+            var ev = new AutoResetEvent(false);
+            Handles.Enqueue(ev);
+
+            lock (Worker)
+                if (!Worker.IsBusy && !Timer.Enabled)
+                    Worker.RunWorkerAsync();
+
+            EventWaitHandleFlag.Set();
+            ev.WaitOne();
+
+            
+
+            return await action();
         }
     }
 }
